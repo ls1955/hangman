@@ -1,5 +1,7 @@
 # frozen_string_literal: false
 
+require 'csv'
+
 # show intro, outro, and manage the whole game
 class Hangman
   attr_reader :answer, :player
@@ -19,10 +21,33 @@ class Hangman
   def run
     intro
     process_turn
+    outro
   end
 
   def intro
-    puts 'Please enter a character.'
+    puts "Enter '1' to load the save file."
+    puts 'Otherwise, enter any other character to start the game.'
+
+    load_save if gets.chomp == '1'
+  end
+
+  def load_save
+    CSV.open('./save/save.csv').each do |row|
+      @input_history = row[0]
+      @choices = row[1]
+      @answer = row[2]
+      @teaser = row[3]
+      @life = row[4]
+    end
+    clean_attr
+  end
+
+  def clean_attr
+    @input_history = @input_history.split('')
+    @choices = @choices.split('')
+    @answer = @answer.split('')
+    @teaser = @teaser.split('')
+    @life = @life.to_i
   end
 
   def process_turn
@@ -30,7 +55,13 @@ class Hangman
       prompt
       input = player.choose_char
 
+      if input == '1'
+        save_game
+        break
+      end
+
       unless valid_input?(input)
+        puts "\n\n"
         puts 'Invalid input, please try again.'
         process_turn
       end
@@ -40,12 +71,11 @@ class Hangman
       answer.include?(input) ? update_teaser(input) : reduce_life
       check_outcome
     end
-
-    outro
   end
 
   def prompt
     puts "\n\n"
+    puts "Enter '1' to save the game."
     puts "Input history: #{input_history}"
     puts ''
     puts "Remaining life: #{life}."
@@ -54,8 +84,16 @@ class Hangman
     puts "\n\n"
   end
 
+  def save_game
+    CSV.open('./save/save.csv', 'w') do |file|
+      file << [input_history.join(''), choices.join(''), answer.join(''), teaser.join(''), life]
+    end
+
+    @game_end = true
+  end
+
   def update_teaser(input)
-    answer.each_with_index { |char, i| teaser[i] = input if char == input } 
+    answer.each_with_index { |char, i| teaser[i] = input if char == input }
   end
 
   def reduce_life
@@ -76,10 +114,23 @@ class Hangman
       puts "The answer is #{answer}."
       puts 'Better luck next time.'
     else
-      puts 'Congratulations, you win the game.'
+      puts 'Thanks for playing.'
     end
 
-    # start a new game?
+    puts 'Enter 1 to start a new game.'
+
+    init if gets.chomp == '1'
+  end
+
+  def init
+    @input_history = []
+    @choices = ('a'..'z').to_a
+    @answer = Dictionary.new('./asset/google-10000-english-no-swears.txt').random_word.split('')
+    @teaser = Array.new(answer.length, '_')
+    @life = 6
+    @game_end = false
+
+    run
   end
 end
 
